@@ -19,8 +19,8 @@ const upload = multer({ storage: multer.memoryStorage() });
 const ACCOUNT_ID = "YOUR_ACCOUNT_ID"; // not used but fine to keep
 const BUCKET_NAME = "qrcustomers";
 
-const ACCESS_KEY = "757f2bf9d1b4c863ce905735bc05528e";
-const SECRET_KEY = "61cd0e0497e7dc4ca304e6f940a5a1fb9b4fa6822e62b38acf2986a2e8c83d4a";
+const ACCESS_KEY = process.env.ACCESS_KEY;
+const SECRET_KEY = process.env.SECRET_KEY;
 
 const R2 = new S3Client({
   region: "auto",
