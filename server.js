@@ -15,8 +15,6 @@ app.get("/ping", (req, res) => {
   res.send("PING WORKING");
 });
 
-
-
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
@@ -69,15 +67,13 @@ app.get("/test-r2", async (req, res) => {
 // UPLOAD ROUTE
 // ======================
 
-app.post("/upload", (req, res) => {
-  console.log("UPLOAD HIT - CLEAN");
-  res.json({ success: true });
-});
- 
- 
-  try {
+// ======================
+// UPLOAD ROUTE
+// ======================
 
-     if (!ACCESS_KEY || !SECRET_KEY) {
+app.post("/upload", upload.single("file"), async (req, res) => {
+  try {
+    if (!ACCESS_KEY || !SECRET_KEY) {
       console.error("Missing R2 credentials");
       return res.status(500).send("Missing R2 credentials");
     }
@@ -97,22 +93,18 @@ app.post("/upload", (req, res) => {
       size: file.size,
     });
 
-    // 🔹 Get extension
     const ext = file.originalname.split(".").pop().toLowerCase();
 
-    // 🔹 Clean name
     const cleanName = name
       .toLowerCase()
       .replace(/[^a-z0-9]/g, "-")
       .replace(/-+/g, "-")
       .replace(/^-|-$/g, "");
 
-    // 🔹 Build IDs
     const submissionId = `sub_${Math.floor(Date.now() / 1000)}`;
     const fileId = `${submissionId}_${cleanName}`;
     const key = `${fileId}.${ext}`;
 
-    // 🔹 Content type
     const contentType =
       ext === "png"
         ? "image/png"
@@ -121,9 +113,7 @@ app.post("/upload", (req, res) => {
         : "image/jpeg";
 
     console.log("Uploading to R2...");
-    console.log("R2 KEY:", key);
 
-    // 🔹 Upload to R2
     await R2.send(
       new PutObjectCommand({
         Bucket: BUCKET_NAME,
@@ -133,18 +123,11 @@ app.post("/upload", (req, res) => {
       })
     );
 
-    console.log("Upload success");
-
-    // 🔹 Build viewer URL (WITH ext — critical)
     const url = `https://ignitestudio.shop/pages/viewer?id=${fileId}&ext=${ext}&name=${encodeURIComponent(
       name
     )}&msg=${encodeURIComponent(msg)}`;
 
-    // 🔹 Generate QR
     const qr = await QRCode.toDataURL(url);
-    // ======================
-    // SAVE QR TO R2
-    // ======================
 
     const base64Data = qr.replace(/^data:image\/png;base64,/, "");
     const qrBuffer = Buffer.from(base64Data, "base64");
@@ -161,11 +144,13 @@ app.post("/upload", (req, res) => {
     );
 
     const qrUrl = `https://pub-e0dc729813ef47d698495d0ac6ed4e36.r2.dev/${qrKey}`;
+
     res.json({
       success: true,
       url,
       qrUrl,
     });
+
   } catch (err) {
     console.error("UPLOAD ERROR FULL:", err);
 
@@ -174,8 +159,7 @@ app.post("/upload", (req, res) => {
       stack: err.stack,
     });
   }
-
-
+});
 // ======================
 // START SERVER
 // ======================
