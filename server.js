@@ -1,15 +1,14 @@
 const express = require("express");
 const multer = require("multer");
 const cors = require("cors");
+const bodyParser = require("body-parser");
 const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
 const QRCode = require("qrcode");
 
 const app = express();
 app.use(cors());
-
-// 🔹 ADD THESE TWO LINES - Body parser middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -121,31 +120,30 @@ app.post("/upload", upload.single("file"), async (req, res) => {
 
     // 🔹 Generate QR
     const qr = await QRCode.toDataURL(url);
-// ======================
-// SAVE QR TO R2
-// ======================
+    // ======================
+    // SAVE QR TO R2
+    // ======================
 
-const base64Data = qr.replace(/^data:image\/png;base64,/, "");
-const qrBuffer = Buffer.from(base64Data, "base64");
+    const base64Data = qr.replace(/^data:image\/png;base64,/, "");
+    const qrBuffer = Buffer.from(base64Data, "base64");
 
-const qrKey = `qr/${fileId}.png`;
+    const qrKey = `qr/${fileId}.png`;
 
-await R2.send(
-  new PutObjectCommand({
-    Bucket: BUCKET_NAME,
-    Key: qrKey,
-    Body: qrBuffer,
-    ContentType: "image/png",
-  })
-);
+    await R2.send(
+      new PutObjectCommand({
+        Bucket: BUCKET_NAME,
+        Key: qrKey,
+        Body: qrBuffer,
+        ContentType: "image/png",
+      })
+    );
 
-const qrUrl = `https://pub-e0dc729813ef47d698495d0ac6ed4e36.r2.dev/${qrKey}`;
+    const qrUrl = `https://pub-e0dc729813ef47d698495d0ac6ed4e36.r2.dev/${qrKey}`;
     res.json({
-  success: true,
-  url,
-  qrUrl,
-});
-
+      success: true,
+      url,
+      qrUrl,
+    });
   } catch (err) {
     console.error("UPLOAD ERROR FULL:", err);
 
