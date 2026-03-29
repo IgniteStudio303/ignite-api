@@ -63,10 +63,7 @@ app.get("/test-r2", async (req, res) => {
 // UPLOAD ROUTE
 // ======================
 
-app.post("/upload", (req, res) => {
-  console.log("UPLOAD HIT - CLEAN");
-  res.json({ success: true });
-});
+app.post("/upload", upload.single("file"), async (req, res) => {
   try {
 
      if (!ACCESS_KEY || !SECRET_KEY) {
