@@ -1,4 +1,3 @@
-const { FetchHttpHandler } = require("@aws-sdk/fetch-http-handler");
 const express = require("express");
 const multer = require("multer");
 const cors = require("cors");
@@ -24,7 +23,6 @@ const R2 = new S3Client({
   region: "auto",
   endpoint: "https://45fd60aef9d00d71655dbf7349197c8c.r2.cloudflarestorage.com",
   forcePathStyle: true,
-  requestHandler: new FetchHttpHandler(),
   credentials: {
     accessKeyId: ACCESS_KEY.trim(),
     secretAccessKey: SECRET_KEY.trim(),
