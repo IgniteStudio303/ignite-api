@@ -65,6 +65,12 @@ app.get("/test-r2", async (req, res) => {
 
 app.post("/upload", upload.single("file"), async (req, res) => {
   try {
+
+     if (!ACCESS_KEY || !SECRET_KEY) {
+      console.error("Missing R2 credentials");
+      return res.status(500).send("Missing R2 credentials");
+    }
+
     console.log("Upload route hit");
 
     const file = req.file;
