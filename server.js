@@ -6,7 +6,12 @@ const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
 const QRCode = require("qrcode");
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: "https://ignitestudio.shop",
+  methods: ["GET", "POST"],
+  allowedHeaders: ["Content-Type"]
+}));
+
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
