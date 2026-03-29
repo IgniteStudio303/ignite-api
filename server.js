@@ -1,3 +1,4 @@
+console.log("RUNNING CORRECT SERVER FILE");
 const express = require("express");
 const multer = require("multer");
 const cors = require("cors");
