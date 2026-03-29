@@ -159,6 +159,9 @@ const qrUrl = `https://pub-e0dc729813ef47d698495d0ac6ed4e36.r2.dev/${qrKey}`;
 // ======================
 
 const PORT = process.env.PORT || 3000;
+app.get("/test-r2", (req, res) => {
+  res.send("R2 upload success");
+});
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
