@@ -19,9 +19,18 @@ const upload = multer({ storage: multer.memoryStorage() });
 const ACCOUNT_ID = "YOUR_ACCOUNT_ID"; // not used but fine to keep
 const BUCKET_NAME = "qrcustomers";
 
-const ACCESS_KEY = process.env.ACCESS_KEY;
-const SECRET_KEY = process.env.SECRET_KEY;
+const ACCESS_KEY = process.env.ACCESS_KEY || "";
+const SECRET_KEY = process.env.SECRET_KEY || "";
 
+const R2 = new S3Client({
+  region: "auto",
+  endpoint: "https://45fd60aef9d00d71655dbf7349197c8c.r2.cloudflarestorage.com",
+  forcePathStyle: true,
+  credentials: {
+    accessKeyId: ACCESS_KEY,
+    secretAccessKey: SECRET_KEY,
+  },
+});
 const R2 = new S3Client({
   region: "auto",
   endpoint: "https://45fd60aef9d00d71655dbf7349197c8c.r2.cloudflarestorage.com",
