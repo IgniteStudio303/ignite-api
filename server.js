@@ -161,7 +161,10 @@ const PORT = process.env.PORT || 10000;
 app.get("/", (req, res) => {
   res.send("ROOT WORKING");
 });
+console.log("PORT VALUE:", process.env.PORT);
 
-app.listen(PORT, "0.0.0.0", () => {
+const PORT = process.env.PORT;
+
+app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
