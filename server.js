@@ -31,15 +31,7 @@ const R2 = new S3Client({
     secretAccessKey: SECRET_KEY,
   },
 });
-const R2 = new S3Client({
-  region: "auto",
-  endpoint: "https://45fd60aef9d00d71655dbf7349197c8c.r2.cloudflarestorage.com",
-  forcePathStyle: true,
-  credentials: {
-    accessKeyId: ACCESS_KEY.trim(),
-    secretAccessKey: SECRET_KEY.trim(),
-  },
-});
+
 
 // ======================
 // TEST ROUTE
