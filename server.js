@@ -7,6 +7,10 @@ const QRCode = require("qrcode");
 const app = express();
 app.use(cors());
 
+// 🔹 ADD THESE TWO LINES - Body parser middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
 const upload = multer({ storage: multer.memoryStorage() });
 
 // ======================
