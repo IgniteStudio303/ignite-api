@@ -11,6 +11,12 @@ app.use(cors({
   origin: "*"
 }));
 
+app.get("/ping", (req, res) => {
+  res.send("PING WORKING");
+});
+
+
+
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
