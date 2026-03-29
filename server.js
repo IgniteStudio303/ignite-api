@@ -7,9 +7,7 @@ const QRCode = require("qrcode");
 
 const app = express();
 app.use(cors({
-  origin: "https://ignitestudio.shop",
-  methods: ["GET", "POST"],
-  allowedHeaders: ["Content-Type"]
+  origin: "*"
 }));
 
 app.use(bodyParser.json());
