@@ -1,3 +1,5 @@
+require('dotenv').config();
+console.log("R2 CHECK:", process.env.R2_ACCESS_KEY_ID);
 console.log("RUNNING CORRECT SERVER FILE");
 const express = require("express");
 const multer = require("multer");
@@ -24,15 +26,22 @@ const upload = multer({ storage: multer.memoryStorage() });
 // CONFIG
 // ======================
 
-const ACCOUNT_ID = "YOUR_ACCOUNT_ID"; // not used but fine to keep
-const BUCKET_NAME = "qrcustomers";
+const ACCOUNT_ID = process.env.R2_ACCOUNT_ID || "";
+const BUCKET_NAME = process.env.R2_BUCKET || "";
 
-const ACCESS_KEY = process.env.ACCESS_KEY || "";
-const SECRET_KEY = process.env.SECRET_KEY || "";
+const ACCESS_KEY = process.env.R2_ACCESS_KEY_ID || "";
+const SECRET_KEY = process.env.R2_SECRET_ACCESS_KEY || "";
+
+console.log("R2 DEBUG:", {
+  ACCOUNT_ID,
+  ACCESS_KEY: ACCESS_KEY ? "OK" : "MISSING",
+  SECRET_KEY: SECRET_KEY ? "OK" : "MISSING",
+  BUCKET_NAME,
+});
 
 const R2 = new S3Client({
   region: "auto",
-  endpoint: "https://45fd60aef9d00d71655dbf7349197c8c.r2.cloudflarestorage.com",
+  endpoint: `https://${ACCOUNT_ID}.r2.cloudflarestorage.com`,
   forcePathStyle: true,
   credentials: {
     accessKeyId: ACCESS_KEY,
@@ -67,10 +76,6 @@ app.get("/test-r2", async (req, res) => {
 // UPLOAD ROUTE
 // ======================
 
-// ======================
-// UPLOAD ROUTE
-// ======================
-
 app.post("/upload", upload.single("file"), async (req, res) => {
   try {
     if (!ACCESS_KEY || !SECRET_KEY) {
@@ -83,6 +88,8 @@ app.post("/upload", upload.single("file"), async (req, res) => {
     const file = req.file;
     const name = req.body.name || "Friend";
     const msg = req.body.msg || "";
+    const variant = req.body.variant || "";
+    console.log("VARIANT RECEIVED:", variant);
 
     if (!file) {
       return res.status(400).send("No file uploaded");
@@ -123,9 +130,7 @@ app.post("/upload", upload.single("file"), async (req, res) => {
       })
     );
 
-    const url = `https://ignitestudio.shop/pages/viewer?id=${fileId}&ext=${ext}&name=${encodeURIComponent(
-      name
-    )}&msg=${encodeURIComponent(msg)}`;
+   const url = `https://ignitestudio.shop/pages/viewer?id=${fileId}&ext=${ext}&variant=${variant}&name=${encodeURIComponent(name)}&msg=${encodeURIComponent(msg)}`;
 
     const qr = await QRCode.toDataURL(url);
 
@@ -146,10 +151,10 @@ app.post("/upload", upload.single("file"), async (req, res) => {
     const qrUrl = `https://pub-e0dc729813ef47d698495d0ac6ed4e36.r2.dev/${qrKey}`;
 
     res.json({
-      success: true,
-      url,
-      qrUrl,
-    });
+  success: true,
+  url: `${url}&variant=${variant}`,
+  qrUrl,
+});
 
   } catch (err) {
     console.error("UPLOAD ERROR FULL:", err);
