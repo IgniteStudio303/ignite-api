@@ -1,3 +1,4 @@
+console.log("🚨 THIS FILE IS RUNNING:", __filename);
 require('dotenv').config();
 console.log("RUNNING CORRECT SERVER FILE");
 
