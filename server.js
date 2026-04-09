@@ -137,23 +137,42 @@ app.post("/upload", upload.single("file"), async (req, res) => {
 
     const url = `https://ignitestudio.shop/pages/viewer?id=${fileId}&ext=${ext}&variant=${variant}&name=${encodeURIComponent(name)}&msg=${encodeURIComponent(message)}`;
 
-    const qr = await QRCode.toDataURL(url);
+    console.log("GENERATING QR FOR URL:", url);
 
-    const base64Data = qr.replace(/^data:image\/png;base64,/, "");
-    const qrBuffer = Buffer.from(base64Data, "base64");
+let qr;
+try {
+  qr = await QRCode.toDataURL(url);
+  console.log("QR GENERATED SUCCESS");
+} catch (err) {
+  console.error("QR GENERATION FAILED:", err);
+}
 
-    const qrKey = `qr/${fileId}.png`;
+if (!qr) {
+  console.error("QR IS EMPTY — SKIPPING UPLOAD");
+}
 
-    await R2.send(
-      new PutObjectCommand({
-        Bucket: BUCKET_NAME,
-        Key: qrKey,
-        Body: qrBuffer,
-        ContentType: "image/png",
-      })
-    );
+const base64Data = qr.replace(/^data:image\/png;base64,/, "");
+const qrBuffer = Buffer.from(base64Data, "base64");
 
-    const qrUrl = `https://pub-e0dc729813ef47d698495d0ac6ed4e36.r2.dev/${qrKey}`;
+const qrKey = `qr/${fileId}.png`;
+
+console.log("UPLOADING QR TO R2:", qrKey);
+
+try {
+  await R2.send(
+    new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: qrKey,
+      Body: qrBuffer,
+      ContentType: "image/png",
+    })
+  );
+  console.log("QR UPLOAD SUCCESS");
+} catch (err) {
+  console.error("QR UPLOAD FAILED:", err);
+}
+
+const qrUrl = `https://pub-e0dc729813ef47d698495d0ac6ed4e36.r2.dev/${qrKey}`;
 
     // ✅ UPDATED RESPONSE (this is the key change)
  
@@ -164,7 +183,7 @@ app.post("/upload", upload.single("file"), async (req, res) => {
   variant: variant,
   url: `${url}&variant=${variant}&addToCart=true`,
   qrUrl,
-};
+};  
 
 console.log("FINAL RESPONSE PAYLOAD:", responsePayload);
 
