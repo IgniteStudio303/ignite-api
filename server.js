@@ -123,9 +123,9 @@ app.post("/upload", upload.single("file"), async (req, res) => {
     try {
       qr = await QRCode.toDataURL(url);
       console.log("STEP 4: QR GENERATED");
-    } catch (err) {
-      console.error("QR GENERATION FAILED:", err);
-    }
+ catch (err) {
+  console.error("QR UPLOAD FAILED FULL:", JSON.stringify(err, null, 2));
+}
 
     if (!qr) {
       console.error("QR IS EMPTY — SKIPPING UPLOAD");
