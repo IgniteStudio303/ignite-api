@@ -11,13 +11,7 @@ const QRCode = require("qrcode");
 
 const app = express();
 
-app.use(cors({
-  origin: "*"
-}));
-
-app.get("/ping", (req, res) => {
-  res.send("PING WORKING");
-});
+app.use(cors({ origin: "*" }));
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -55,22 +49,8 @@ const R2 = new S3Client({
 // TEST ROUTE
 // ======================
 
-app.get("/test-r2", async (req, res) => {
-  try {
-    await R2.send(
-      new PutObjectCommand({
-        Bucket: BUCKET_NAME,
-        Key: "test.txt",
-        Body: "hello world",
-        ContentType: "text/plain",
-      })
-    );
-
-    res.send("R2 upload success");
-  } catch (err) {
-    console.error("R2 TEST ERROR:", err);
-    res.status(500).json(err);
-  }
+app.get("/ping", (req, res) => {
+  res.send("PING WORKING");
 });
 
 // ======================
@@ -79,30 +59,23 @@ app.get("/test-r2", async (req, res) => {
 
 app.post("/upload", upload.single("file"), async (req, res) => {
   try {
+    console.log("🔥 UPLOAD ROUTE HIT 🔥");
+
     if (!ACCESS_KEY || !SECRET_KEY) {
       console.error("Missing R2 credentials");
       return res.status(500).send("Missing R2 credentials");
     }
 
-    console.log("Upload route hit");
-
     const file = req.file;
+    console.log("STEP 1: FILE RECEIVED");
 
-    // ✅ FIXED: message now matches frontend
     const message = req.body.message || "";
     const name = req.body.name || "Friend";
     const variant = req.body.variant || "";
 
-    console.log("VARIANT RECEIVED:", variant);
-
     if (!file) {
       return res.status(400).send("No file uploaded");
     }
-
-    console.log("File received:", {
-      name: file.originalname,
-      size: file.size,
-    });
 
     const ext = file.originalname.split(".").pop().toLowerCase();
 
@@ -112,7 +85,6 @@ app.post("/upload", upload.single("file"), async (req, res) => {
       .replace(/-+/g, "-")
       .replace(/^-|-$/g, "");
 
-    // ✅ This becomes your uploadId
     const submissionId = `sub_${Math.floor(Date.now() / 1000)}`;
     const fileId = `${submissionId}_${cleanName}`;
     const key = `${fileId}.${ext}`;
@@ -124,7 +96,9 @@ app.post("/upload", upload.single("file"), async (req, res) => {
         ? "video/mp4"
         : "image/jpeg";
 
-    console.log("Uploading to R2...");
+    // ======================
+    // FILE UPLOAD
+    // ======================
 
     await R2.send(
       new PutObjectCommand({
@@ -135,59 +109,72 @@ app.post("/upload", upload.single("file"), async (req, res) => {
       })
     );
 
+    console.log("STEP 2: FILE UPLOADED TO R2");
+
+    // ======================
+    // QR GENERATION
+    // ======================
+
+    console.log("STEP 3: STARTING QR GENERATION");
+
     const url = `https://ignitestudio.shop/pages/viewer?id=${fileId}&ext=${ext}&variant=${variant}&name=${encodeURIComponent(name)}&msg=${encodeURIComponent(message)}`;
 
-    console.log("GENERATING QR FOR URL:", url);
+    let qr;
+    try {
+      qr = await QRCode.toDataURL(url);
+      console.log("STEP 4: QR GENERATED");
+    } catch (err) {
+      console.error("QR GENERATION FAILED:", err);
+    }
 
-let qr;
-try {
-  qr = await QRCode.toDataURL(url);
-  console.log("QR GENERATED SUCCESS");
-} catch (err) {
-  console.error("QR GENERATION FAILED:", err);
-}
+    if (!qr) {
+      console.error("QR IS EMPTY — SKIPPING UPLOAD");
+    }
 
-if (!qr) {
-  console.error("QR IS EMPTY — SKIPPING UPLOAD");
-}
+    // ======================
+    // QR UPLOAD
+    // ======================
 
-const base64Data = qr.replace(/^data:image\/png;base64,/, "");
-const qrBuffer = Buffer.from(base64Data, "base64");
+    const base64Data = qr.replace(/^data:image\/png;base64,/, "");
+    const qrBuffer = Buffer.from(base64Data, "base64");
 
-const qrKey = `qr/${fileId}.png`;
+    const qrKey = `qr/${fileId}.png`;
 
-console.log("UPLOADING QR TO R2:", qrKey);
+    try {
+      await R2.send(
+        new PutObjectCommand({
+          Bucket: BUCKET_NAME,
+          Key: qrKey,
+          Body: qrBuffer,
+          ContentType: "image/png",
+        })
+      );
 
-try {
-  await R2.send(
-    new PutObjectCommand({
-      Bucket: BUCKET_NAME,
-      Key: qrKey,
-      Body: qrBuffer,
-      ContentType: "image/png",
-    })
-  );
-  console.log("QR UPLOAD SUCCESS");
-} catch (err) {
-  console.error("QR UPLOAD FAILED:", err);
-}
+      console.log("STEP 5: QR UPLOADED");
+    } catch (err) {
+      console.error("QR UPLOAD FAILED:", err);
+    }
 
-const qrUrl = `https://pub-e0dc729813ef47d698495d0ac6ed4e36.r2.dev/${qrKey}`;
+    const qrUrl = `https://pub-e0dc729813ef47d698495d0ac6ed4e36.r2.dev/${qrKey}`;
 
-    // ✅ UPDATED RESPONSE (this is the key change)
- 
+    // ======================
+    // RESPONSE
+    // ======================
+
     const responsePayload = {
-  success: true,
-  uploadId: submissionId,
-  fileId: fileId,
-  variant: variant,
-  url: `${url}&variant=${variant}&addToCart=true`,
-  qrUrl,
-};  
+      success: true,
+      uploadId: submissionId,
+      fileId: fileId,
+      variant: variant,
+      message: message,
+      name: name,
+      url: `${url}&variant=${variant}&addToCart=true`,
+      qrUrl,
+    };
 
-console.log("FINAL RESPONSE PAYLOAD:", responsePayload);
+    console.log("FINAL RESPONSE PAYLOAD:", responsePayload);
 
-res.json(responsePayload);
+    res.json(responsePayload);
 
   } catch (err) {
     console.error("UPLOAD ERROR FULL:", err);
