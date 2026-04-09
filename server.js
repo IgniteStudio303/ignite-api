@@ -156,14 +156,19 @@ app.post("/upload", upload.single("file"), async (req, res) => {
     const qrUrl = `https://pub-e0dc729813ef47d698495d0ac6ed4e36.r2.dev/${qrKey}`;
 
     // ✅ UPDATED RESPONSE (this is the key change)
-    res.json({
-      success: true,
-      uploadId: submissionId, // 🔥 critical for linking to cart/order
-      fileId: fileId,
-      variant: variant,
-      url: `${url}&variant=${variant}&addToCart=true`,
-      qrUrl,
-    });
+ 
+    const responsePayload = {
+  success: true,
+  uploadId: submissionId,
+  fileId: fileId,
+  variant: variant,
+  url: `${url}&variant=${variant}&addToCart=true`,
+  qrUrl,
+};
+
+console.log("FINAL RESPONSE PAYLOAD:", responsePayload);
+
+res.json(responsePayload);
 
   } catch (err) {
     console.error("UPLOAD ERROR FULL:", err);
