@@ -155,7 +155,7 @@ app.post("/upload", upload.single("file"), async (req, res) => {
       console.error("QR UPLOAD FAILED:", err);
     }
 
-    const qrUrl = `https://pub-e0dc729813ef47d698495d0ac6ed4e36.r2.dev/${qrKey}`;
+    const qrUrl = `https://pub-676d7b5d3431443084db6a06b3ce26e3.r2.dev/${qrKey}`;
 
     // ======================
     // RESPONSE
