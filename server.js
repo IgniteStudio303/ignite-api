@@ -1,6 +1,7 @@
 require('dotenv').config();
 console.log("R2 CHECK:", process.env.R2_ACCESS_KEY_ID);
 console.log("RUNNING CORRECT SERVER FILE");
+
 const express = require("express");
 const multer = require("multer");
 const cors = require("cors");
@@ -9,6 +10,7 @@ const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
 const QRCode = require("qrcode");
 
 const app = express();
+
 app.use(cors({
   origin: "*"
 }));
@@ -49,7 +51,6 @@ const R2 = new S3Client({
   },
 });
 
-
 // ======================
 // TEST ROUTE
 // ======================
@@ -86,9 +87,12 @@ app.post("/upload", upload.single("file"), async (req, res) => {
     console.log("Upload route hit");
 
     const file = req.file;
+
+    // ✅ FIXED: message now matches frontend
+    const message = req.body.message || "";
     const name = req.body.name || "Friend";
-    const msg = req.body.msg || "";
     const variant = req.body.variant || "";
+
     console.log("VARIANT RECEIVED:", variant);
 
     if (!file) {
@@ -108,6 +112,7 @@ app.post("/upload", upload.single("file"), async (req, res) => {
       .replace(/-+/g, "-")
       .replace(/^-|-$/g, "");
 
+    // ✅ This becomes your uploadId
     const submissionId = `sub_${Math.floor(Date.now() / 1000)}`;
     const fileId = `${submissionId}_${cleanName}`;
     const key = `${fileId}.${ext}`;
@@ -130,7 +135,7 @@ app.post("/upload", upload.single("file"), async (req, res) => {
       })
     );
 
-   const url = `https://ignitestudio.shop/pages/viewer?id=${fileId}&ext=${ext}&variant=${variant}&name=${encodeURIComponent(name)}&msg=${encodeURIComponent(msg)}`;
+    const url = `https://ignitestudio.shop/pages/viewer?id=${fileId}&ext=${ext}&variant=${variant}&name=${encodeURIComponent(name)}&msg=${encodeURIComponent(message)}`;
 
     const qr = await QRCode.toDataURL(url);
 
@@ -150,11 +155,15 @@ app.post("/upload", upload.single("file"), async (req, res) => {
 
     const qrUrl = `https://pub-e0dc729813ef47d698495d0ac6ed4e36.r2.dev/${qrKey}`;
 
+    // ✅ UPDATED RESPONSE (this is the key change)
     res.json({
-  success: true,
-  url: `${url}&variant=${variant}`,
-  qrUrl,
-});
+      success: true,
+      uploadId: submissionId, // 🔥 critical for linking to cart/order
+      fileId: fileId,
+      variant: variant,
+      url: `${url}&variant=${variant}&addToCart=true`,
+      qrUrl,
+    });
 
   } catch (err) {
     console.error("UPLOAD ERROR FULL:", err);
@@ -165,6 +174,7 @@ app.post("/upload", upload.single("file"), async (req, res) => {
     });
   }
 });
+
 // ======================
 // START SERVER
 // ======================
