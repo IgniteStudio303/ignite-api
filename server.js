@@ -143,7 +143,7 @@ app.post("/upload", upload.single("file"), async (req, res) => {
     try {
       await R2.send(
         new PutObjectCommand({
-          Bucket: BUCKET_NAME,
+          Bucket: qrcodes,
           Key: qrKey,
           Body: qrBuffer,
           ContentType: "image/png",
