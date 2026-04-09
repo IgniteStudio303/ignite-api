@@ -176,8 +176,9 @@ app.post("/upload", upload.single("file"), async (req, res) => {
 
     res.json(responsePayload);
 
-  } catch (err) {
-    console.error("UPLOAD ERROR FULL:", err);
+ catch (err) {
+  console.error("QR UPLOAD FAILED FULL:", JSON.stringify(err, null, 2));
+}
 
     res.status(500).json({
       message: err.message,
