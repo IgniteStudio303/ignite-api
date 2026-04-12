@@ -60,7 +60,13 @@ app.post("/upload", upload.single("file"), async (req, res) => {
       return res.status(400).send("No file uploaded");
     }
 
-    const ext = file.originalname.split(".").pop().toLowerCase();
+  let ext = file.originalname.split(".").pop();
+
+if (!ext) {
+  ext = "png";
+}
+
+ext = ext.toLowerCase();
 
     const cleanName = name
       .toLowerCase()
