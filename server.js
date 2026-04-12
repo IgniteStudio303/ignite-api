@@ -1,4 +1,3 @@
-console.log("🚨 THIS FILE IS RUNNING:", __filename);
 require('dotenv').config();
 console.log("RUNNING CORRECT SERVER FILE");
 
@@ -108,30 +107,29 @@ app.post("/upload", upload.single("file"), async (req, res) => {
     let qrUrl = null;
 
     try {
-      console.log("GENERATING QR");
+    console.log("GENERATING QR");
 
-      const qr = await QRCode.toDataURL(url);
+const qr = await QRCode.toDataURL(url);
 
-      const base64Data = qr.replace(/^data:image\/png;base64,/, "");
-      const qrBuffer = Buffer.from(base64Data, "base64");
+const base64Data = qr.replace(/^data:image\/png;base64,/, "");
+const qrBuffer = Buffer.from(base64Data, "base64");
 
-      const qrKey = `qr/${fileId}.png`;
+const qrKey = `qr/${fileId}.png`;
 
-      // ======================
-      // TRY QR UPLOAD (qrcodes)
-      // ======================
+console.log("ATTEMPTING QR UPLOAD TO qrcodes");
 
-      await R2.send(
-        new PutObjectCommand({
-          Bucket: "qrcodes", // 🔥 QR bucket ONLY
-          Key: qrKey,
-          Body: qrBuffer,
-          ContentType: "image/png",
-        })
-      );
+await R2.send(
+  new PutObjectCommand({
+    Bucket: "qrcodes", // 🔥 force only this
+    Key: qrKey,
+    Body: qrBuffer,
+    ContentType: "image/png",
+  })
+);
 
-      qrUrl = `https://pub-676d7b5d3431443084db6a06b3ce26e3.r2.dev/${qrKey}`;
+const qrUrl = `https://pub-676d7b5d3431443084db6a06b3ce26e3.r2.dev/${qrKey}`;
 
+console.log("QR SUCCESSFULLY STORED IN qrcodes");
       console.log("QR UPLOADED TO qrcodes");
 
     } catch (err) {
