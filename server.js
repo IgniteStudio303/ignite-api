@@ -60,10 +60,6 @@ app.post("/upload", upload.single("file"), async (req, res) => {
       return res.status(400).send("No file uploaded");
     }
 
-    // ======================
-    // FILE SETUP
-    // ======================
-
     const ext = file.originalname.split(".").pop().toLowerCase();
 
     const cleanName = name
@@ -89,7 +85,7 @@ app.post("/upload", upload.single("file"), async (req, res) => {
 
     await R2.send(
       new PutObjectCommand({
-        Bucket: BUCKET_NAME, // ✅ KEEP THIS
+        Bucket: BUCKET_NAME,
         Key: key,
         Body: file.buffer,
         ContentType: contentType,
@@ -99,67 +95,38 @@ app.post("/upload", upload.single("file"), async (req, res) => {
     console.log("IMAGE UPLOADED");
 
     // ======================
+    // BUILD VIEWER URL (🔥 IMPORTANT)
+    // ======================
+
+    const viewerUrl = `https://ignitestudio.shop/pages/viewer?id=${fileId}&ext=${ext}&variant=${variant}&name=${encodeURIComponent(name)}&msg=${encodeURIComponent(message)}`;
+
+    // ======================
     // QR GENERATION
     // ======================
 
-    const url = `https://ignitestudio.shop/pages/viewer?id=${fileId}&ext=${ext}&variant=${variant}&name=${encodeURIComponent(name)}&msg=${encodeURIComponent(message)}`;
-
-    let qrUrl = null;
-
-    try {
     console.log("GENERATING QR");
 
-const qr = await QRCode.toDataURL(url);
+    const qr = await QRCode.toDataURL(viewerUrl);
 
-const base64Data = qr.replace(/^data:image\/png;base64,/, "");
-const qrBuffer = Buffer.from(base64Data, "base64");
+    const base64Data = qr.replace(/^data:image\/png;base64,/, "");
+    const qrBuffer = Buffer.from(base64Data, "base64");
 
-const qrKey = `qr/${fileId}.png`;
+    const qrKey = `qr/${fileId}.png`;
 
-console.log("ATTEMPTING QR UPLOAD TO qrcodes");
+    console.log("ATTEMPTING QR UPLOAD TO qrcodes");
 
-await R2.send(
-  new PutObjectCommand({
-    Bucket: "qrcodes", // 🔥 force only this
-    Key: qrKey,
-    Body: qrBuffer,
-    ContentType: "image/png",
-  })
-);
+    await R2.send(
+      new PutObjectCommand({
+        Bucket: "qrcodes",
+        Key: qrKey,
+        Body: qrBuffer,
+        ContentType: "image/png",
+      })
+    );
 
-const qrUrl = `https://pub-676d7b5d3431443084db6a06b3ce26e3.r2.dev/${qrKey}`;
+    const qrUrl = `https://pub-676d7b5d3431443084db6a06b3ce26e3.r2.dev/${qrKey}`;
 
-console.log("QR SUCCESSFULLY STORED IN qrcodes");
-      console.log("QR UPLOADED TO qrcodes");
-
-    } catch (err) {
-      console.error("QR FAILED — FALLING BACK:", err.message);
-
-      // fallback: store QR in main bucket so system doesn't break
-      try {
-        const qr = await QRCode.toDataURL(url);
-        const base64Data = qr.replace(/^data:image\/png;base64,/, "");
-        const qrBuffer = Buffer.from(base64Data, "base64");
-
-        const qrKey = `qr/${fileId}.png`;
-
-        await R2.send(
-          new PutObjectCommand({
-            Bucket: BUCKET_NAME,
-            Key: qrKey,
-            Body: qrBuffer,
-            ContentType: "image/png",
-          })
-        );
-
-        qrUrl = `https://pub-e0dc729813ef47d698495d0ac6ed4e36.r2.dev/${qrKey}`;
-
-        console.log("QR STORED IN FALLBACK (qrcustomers)");
-
-      } catch (fallbackErr) {
-        console.error("QR FALLBACK FAILED:", fallbackErr.message);
-      }
-    }
+    console.log("QR SUCCESSFULLY STORED IN qrcodes");
 
     // ======================
     // RESPONSE
@@ -173,6 +140,7 @@ console.log("QR SUCCESSFULLY STORED IN qrcodes");
       message,
       name,
       qrUrl,
+      url: viewerUrl // 🔥 THIS WAS MISSING
     });
 
   } catch (err) {
