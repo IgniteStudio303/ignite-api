@@ -104,7 +104,7 @@ ext = ext.toLowerCase();
     // BUILD VIEWER URL (🔥 IMPORTANT)
     // ======================
 
-    const viewerUrl = `https://ignitestudio.shop/pages/viewer?id=${fileId}&ext=${ext}&variant=${variant}&name=${encodeURIComponent(name)}&msg=${encodeURIComponent(message)}`;
+    const viewerUrl = `https://ignitestudio.shop/pages/viewer?id=${fileId}&ext=${ext}&name=${encodeURIComponent(name)}&msg=${encodeURIComponent(message)}`;
 
     // ======================
     // QR GENERATION
