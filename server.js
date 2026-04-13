@@ -7,8 +7,8 @@ const cors = require("cors");
 const bodyParser = require("body-parser");
 const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
 const QRCode = require("qrcode");
-const sqlite3 = require("sqlite3").verbose();
 const { Parser } = require("json2csv");
+const fs = require("fs");
 
 const app = express();
 
@@ -19,20 +19,22 @@ app.use(bodyParser.urlencoded({ extended: true }));
 const upload = multer({ storage: multer.memoryStorage() });
 
 // ======================
-// DATABASE (NEW)
+// SIMPLE STORAGE (JSON)
 // ======================
 
-const db = new sqlite3.Database("/tmp/uploads.db");
+const DATA_FILE = "/tmp/uploads.json";
 
-db.run(`
-  CREATE TABLE IF NOT EXISTS uploads (
-    id TEXT PRIMARY KEY,
-    file_url TEXT,
-    name TEXT,
-    message TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )
-`);
+function loadData() {
+  try {
+    return JSON.parse(fs.readFileSync(DATA_FILE));
+  } catch {
+    return [];
+  }
+}
+
+function saveData(data) {
+  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+}
 
 // ======================
 // CONFIG
@@ -80,27 +82,23 @@ app.get("/ping", (req, res) => {
 });
 
 // ======================
-// ADMIN ROUTES (NEW)
+// ADMIN ROUTES
 // ======================
 
 app.get("/admin/uploads", (req, res) => {
-  db.all("SELECT * FROM uploads ORDER BY created_at DESC", [], (err, rows) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json(rows);
-  });
+  const data = loadData();
+  res.json(data.reverse());
 });
 
 app.get("/admin/uploads/csv", (req, res) => {
-  db.all("SELECT * FROM uploads", [], (err, rows) => {
-    if (err) return res.status(500).json({ error: err.message });
+  const data = loadData();
 
-    const parser = new Parser();
-    const csv = parser.parse(rows);
+  const parser = new Parser();
+  const csv = parser.parse(data);
 
-    res.header("Content-Type", "text/csv");
-    res.attachment("uploads.csv");
-    res.send(csv);
-  });
+  res.header("Content-Type", "text/csv");
+  res.attachment("uploads.csv");
+  res.send(csv);
 });
 
 app.get("/admin", (req, res) => {
@@ -171,7 +169,6 @@ app.get("/preview", (req, res) => {
         <meta charset="utf-8"/>
         <meta name="viewport" content="width=device-width, initial-scale=1"/>
         <title>Preview</title>
-        <link rel="preload" as="image" href="${fileUrl}">
         <style>
           body { margin:0; padding:30px; background:#111; color:#fff; text-align:center; }
           .wrap { max-width:700px; margin:auto; }
@@ -199,7 +196,7 @@ app.get("/preview", (req, res) => {
 });
 
 // ======================
-// UPLOAD ROUTE (UPDATED)
+// UPLOAD ROUTE
 // ======================
 
 app.post("/upload", upload.single("file"), async (req, res) => {
@@ -237,12 +234,16 @@ app.post("/upload", upload.single("file"), async (req, res) => {
 
     const previewUrl = `https://ignite-api-1.onrender.com/preview?id=${fileId}&ext=${ext}&name=${encodeURIComponent(name)}&msg=${encodeURIComponent(message)}`;
 
-    // ✅ SAVE TO DB (NEW)
-    db.run(
-      `INSERT INTO uploads (id, file_url, name, message)
-       VALUES (?, ?, ?, ?)`,
-      [submissionId, fileUrl, name, message]
-    );
+    // ✅ SAVE DATA
+    const data = loadData();
+    data.push({
+      id: submissionId,
+      file_url: fileUrl,
+      name,
+      message,
+      created_at: new Date().toISOString()
+    });
+    saveData(data);
 
     res.json({
       success: true,
@@ -266,7 +267,6 @@ app.post("/upload", upload.single("file"), async (req, res) => {
           Body: qrBuffer,
           ContentType: "image/png",
         }));
-
       } catch (err) {
         console.error("QR ERROR:", err.message);
       }
