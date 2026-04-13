@@ -33,7 +33,7 @@ app.post("/upload", upload.single("file"), async (req, res) => {
         : "image/jpeg";
 
     // ======================
-    // UPLOAD IMAGE (FAST)
+    // UPLOAD IMAGE
     // ======================
 
     await R2.send(
@@ -48,13 +48,13 @@ app.post("/upload", upload.single("file"), async (req, res) => {
     console.log("IMAGE UPLOADED");
 
     // ======================
-    // BUILD VIEWER URL
+    // BUILD STANDALONE PREVIEW URL (🔥 NEW)
     // ======================
 
-    const viewerUrl = `https://ignitestudio.shop/pages/viewer?id=${fileId}&ext=${ext}&name=${encodeURIComponent(name)}&msg=${encodeURIComponent(message)}`;
+    const previewUrl = `https://ignite-api-1.onrender.com/preview?id=${fileId}&ext=${ext}&name=${encodeURIComponent(name)}&msg=${encodeURIComponent(message)}`;
 
     // ======================
-    // RESPOND IMMEDIATELY (🔥 SPEED FIX)
+    // RESPOND IMMEDIATELY
     // ======================
 
     res.json({
@@ -63,7 +63,7 @@ app.post("/upload", upload.single("file"), async (req, res) => {
       fileId,
       name,
       message,
-      url: viewerUrl
+      url: previewUrl
     });
 
     // ======================
@@ -74,7 +74,8 @@ app.post("/upload", upload.single("file"), async (req, res) => {
       try {
         console.log("GENERATING QR IN BACKGROUND");
 
-        const qr = await QRCode.toDataURL(viewerUrl);
+        const qr = await QRCode.toDataURL(previewUrl);
+
         const base64Data = qr.replace(/^data:image\/png;base64,/, "");
         const qrBuffer = Buffer.from(base64Data, "base64");
 
