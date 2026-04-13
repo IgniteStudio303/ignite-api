@@ -105,7 +105,7 @@ app.get("/preview", (req, res) => {
           ${
             isVideo
               ? `<video controls autoplay muted><source src="${fileUrl}" type="video/mp4"></video>`
-              : `<img src="${fileUrl}" />`
+              : `<img src="${fileUrl}" style="opacity:0;transition:opacity 0.3s;" onload="this.style.opacity=1" />`
           }
           ${msg ? `<div class="msg">${msg}</div>` : ""}
           <div class="note">You can close this window to return.</div>
