@@ -7,6 +7,8 @@ const cors = require("cors");
 const bodyParser = require("body-parser");
 const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
 const QRCode = require("qrcode");
+const sqlite3 = require("sqlite3").verbose();
+const { Parser } = require("json2csv");
 
 const app = express();
 
@@ -17,11 +19,27 @@ app.use(bodyParser.urlencoded({ extended: true }));
 const upload = multer({ storage: multer.memoryStorage() });
 
 // ======================
+// DATABASE (NEW)
+// ======================
+
+const db = new sqlite3.Database("./uploads.db");
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS uploads (
+    id TEXT PRIMARY KEY,
+    file_url TEXT,
+    name TEXT,
+    message TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )
+`);
+
+// ======================
 // CONFIG
 // ======================
 
 const ACCOUNT_ID = process.env.R2_ACCOUNT_ID || "";
-const BUCKET_NAME = process.env.R2_BUCKET || ""; // qrcustomers
+const BUCKET_NAME = process.env.R2_BUCKET || "";
 const ACCESS_KEY = process.env.R2_ACCESS_KEY_ID || "";
 const SECRET_KEY = process.env.R2_SECRET_ACCESS_KEY || "";
 
@@ -36,6 +54,24 @@ const R2 = new S3Client({
 });
 
 // ======================
+// BASIC AUTH (ADMIN)
+// ======================
+
+app.use("/admin", (req, res, next) => {
+  const auth = { login: "admin", password: "ignite123" };
+
+  const b64auth = (req.headers.authorization || "").split(" ")[1] || "";
+  const [login, password] = Buffer.from(b64auth, "base64").toString().split(":");
+
+  if (login === auth.login && password === auth.password) {
+    return next();
+  }
+
+  res.set("WWW-Authenticate", 'Basic realm="Admin Area"');
+  res.status(401).send("Authentication required.");
+});
+
+// ======================
 // ROUTES
 // ======================
 
@@ -44,7 +80,76 @@ app.get("/ping", (req, res) => {
 });
 
 // ======================
-// PREVIEW ROUTE (standalone window)
+// ADMIN ROUTES (NEW)
+// ======================
+
+app.get("/admin/uploads", (req, res) => {
+  db.all("SELECT * FROM uploads ORDER BY created_at DESC", [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+app.get("/admin/uploads/csv", (req, res) => {
+  db.all("SELECT * FROM uploads", [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+
+    const parser = new Parser();
+    const csv = parser.parse(rows);
+
+    res.header("Content-Type", "text/csv");
+    res.attachment("uploads.csv");
+    res.send(csv);
+  });
+});
+
+app.get("/admin", (req, res) => {
+  res.send(`
+    <html>
+    <head>
+      <title>Uploads Dashboard</title>
+      <style>
+        body { font-family: Arial; padding: 20px; background:#111; color:#fff; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #444; padding: 8px; }
+        img { max-width: 100px; border-radius:6px; }
+        a { color:#0af; }
+      </style>
+    </head>
+    <body>
+      <h2>Uploads Dashboard</h2>
+      <a href="/admin/uploads/csv">Download CSV</a>
+      <table id="table"></table>
+
+      <script>
+        fetch('/admin/uploads')
+          .then(res => res.json())
+          .then(data => {
+            const table = document.getElementById('table');
+
+            let html = '<tr><th>Preview</th><th>Name</th><th>Message</th><th>Date</th></tr>';
+
+            data.forEach(row => {
+              html += \`
+                <tr>
+                  <td><img src="\${row.file_url}" /></td>
+                  <td>\${row.name}</td>
+                  <td>\${row.message}</td>
+                  <td>\${row.created_at}</td>
+                </tr>
+              \`;
+            });
+
+            table.innerHTML = html;
+          });
+      </script>
+    </body>
+    </html>
+  `);
+});
+
+// ======================
+// PREVIEW ROUTE
 // ======================
 
 app.get("/preview", (req, res) => {
@@ -68,36 +173,9 @@ app.get("/preview", (req, res) => {
         <title>Preview</title>
         <link rel="preload" as="image" href="${fileUrl}">
         <style>
-          body {
-            margin:0;
-            padding:30px;
-            background:#111;
-            color:#fff;
-            font-family:Arial, sans-serif;
-            text-align:center;
-          }
-          .wrap {
-            max-width:700px;
-            margin:auto;
-          }
-          h1 {
-            margin-bottom:20px;
-            font-size:28px;
-          }
-          img, video {
-            max-width:100%;
-            border-radius:12px;
-          }
-          .msg {
-            margin-top:20px;
-            font-size:18px;
-            font-style:italic;
-          }
-          .note {
-            margin-top:30px;
-            font-size:14px;
-            color:#bbb;
-          }
+          body { margin:0; padding:30px; background:#111; color:#fff; text-align:center; }
+          .wrap { max-width:700px; margin:auto; }
+          img, video { max-width:100%; border-radius:12px; }
         </style>
       </head>
       <body>
@@ -106,10 +184,9 @@ app.get("/preview", (req, res) => {
           ${
             isVideo
               ? `<video controls autoplay muted><source src="${fileUrl}" type="video/mp4"></video>`
-              : `<img src="${fileUrl}" style="opacity:0;transition:opacity 0.3s;" onload="this.style.opacity=1" />`
+              : `<img src="${fileUrl}" />`
           }
-          ${msg ? `<div class="msg">${msg}</div>` : ""}
-          <div class="note">You can close this window to return.</div>
+          ${msg ? `<div>${msg}</div>` : ""}
         </div>
       </body>
       </html>
@@ -122,13 +199,11 @@ app.get("/preview", (req, res) => {
 });
 
 // ======================
-// UPLOAD ROUTE
+// UPLOAD ROUTE (UPDATED)
 // ======================
 
 app.post("/upload", upload.single("file"), async (req, res) => {
   try {
-    console.log("UPLOAD ROUTE HIT");
-
     const file = req.file;
     const message = req.body.message || "";
     const name = req.body.name || "pet";
@@ -137,43 +212,38 @@ app.post("/upload", upload.single("file"), async (req, res) => {
       return res.status(400).send("No file uploaded");
     }
 
-    let ext = file.originalname.split(".").pop();
-    if (!ext) ext = "png";
+    let ext = file.originalname.split(".").pop() || "png";
     ext = ext.toLowerCase();
 
-    const cleanName = name
-      .toLowerCase()
-      .replace(/[^a-z0-9]/g, "-")
-      .replace(/-+/g, "-")
-      .replace(/^-|-$/g, "");
+    const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, "-");
 
     const submissionId = `sub_${Date.now()}`;
     const fileId = `${submissionId}_${cleanName}`;
     const key = `${fileId}.${ext}`;
 
     const contentType =
-      ext === "png"
-        ? "image/png"
-        : ext === "mp4"
-        ? "video/mp4"
-        : "image/jpeg";
+      ext === "png" ? "image/png" :
+      ext === "mp4" ? "video/mp4" :
+      "image/jpeg";
 
-    // Upload image
-    await R2.send(
-      new PutObjectCommand({
-        Bucket: BUCKET_NAME,
-        Key: key,
-        Body: file.buffer,
-        ContentType: contentType,
-      })
-    );
+    await R2.send(new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+      Body: file.buffer,
+      ContentType: contentType,
+    }));
 
-    console.log("IMAGE UPLOADED");
+    const fileUrl = `https://pub-e0dc729813ef47d698495d0ac6ed4e36.r2.dev/${fileId}.${ext}`;
 
-    // Build preview URL (standalone)
     const previewUrl = `https://ignite-api-1.onrender.com/preview?id=${fileId}&ext=${ext}&name=${encodeURIComponent(name)}&msg=${encodeURIComponent(message)}`;
 
-    // Respond immediately (fast)
+    // ✅ SAVE TO DB (NEW)
+    db.run(
+      `INSERT INTO uploads (id, file_url, name, message)
+       VALUES (?, ?, ?, ?)`,
+      [submissionId, fileUrl, name, message]
+    );
+
     res.json({
       success: true,
       uploadId: submissionId,
@@ -183,27 +253,20 @@ app.post("/upload", upload.single("file"), async (req, res) => {
       url: previewUrl
     });
 
-    // Background QR generation
+    // QR BACKGROUND
     (async () => {
       try {
-        console.log("GENERATING QR IN BACKGROUND");
-
         const qr = await QRCode.toDataURL(previewUrl);
         const base64Data = qr.replace(/^data:image\/png;base64,/, "");
         const qrBuffer = Buffer.from(base64Data, "base64");
 
-        const qrKey = `qr/${fileId}.png`;
+        await R2.send(new PutObjectCommand({
+          Bucket: "qrcodes",
+          Key: `qr/${fileId}.png`,
+          Body: qrBuffer,
+          ContentType: "image/png",
+        }));
 
-        await R2.send(
-          new PutObjectCommand({
-            Bucket: "qrcodes",
-            Key: qrKey,
-            Body: qrBuffer,
-            ContentType: "image/png",
-          })
-        );
-
-        console.log("QR STORED");
       } catch (err) {
         console.error("QR ERROR:", err.message);
       }
