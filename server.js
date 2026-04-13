@@ -1,52 +1,3 @@
-require('dotenv').config();
-console.log("RUNNING CORRECT SERVER FILE");
-
-const express = require("express");
-const multer = require("multer");
-const cors = require("cors");
-const bodyParser = require("body-parser");
-const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
-const QRCode = require("qrcode");
-
-const app = express();
-
-app.use(cors({ origin: "*" }));
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
-
-const upload = multer({ storage: multer.memoryStorage() });
-
-// ======================
-// CONFIG
-// ======================
-
-const ACCOUNT_ID = process.env.R2_ACCOUNT_ID || "";
-const BUCKET_NAME = process.env.R2_BUCKET || ""; // qrcustomers
-const ACCESS_KEY = process.env.R2_ACCESS_KEY_ID || "";
-const SECRET_KEY = process.env.R2_SECRET_ACCESS_KEY || "";
-
-const R2 = new S3Client({
-  region: "auto",
-  endpoint: `https://${ACCOUNT_ID}.r2.cloudflarestorage.com`,
-  forcePathStyle: true,
-  credentials: {
-    accessKeyId: ACCESS_KEY,
-    secretAccessKey: SECRET_KEY,
-  },
-});
-
-// ======================
-// ROUTES
-// ======================
-
-app.get("/ping", (req, res) => {
-  res.send("PING WORKING");
-});
-
-// ======================
-// UPLOAD ROUTE
-// ======================
-
 app.post("/upload", upload.single("file"), async (req, res) => {
   try {
     console.log("UPLOAD ROUTE HIT");
@@ -60,13 +11,9 @@ app.post("/upload", upload.single("file"), async (req, res) => {
       return res.status(400).send("No file uploaded");
     }
 
-  let ext = file.originalname.split(".").pop();
-
-if (!ext) {
-  ext = "png";
-}
-
-ext = ext.toLowerCase();
+    let ext = file.originalname.split(".").pop();
+    if (!ext) ext = "png";
+    ext = ext.toLowerCase();
 
     const cleanName = name
       .toLowerCase()
@@ -86,7 +33,7 @@ ext = ext.toLowerCase();
         : "image/jpeg";
 
     // ======================
-    // UPLOAD IMAGE (qrcustomers)
+    // UPLOAD IMAGE (FAST)
     // ======================
 
     await R2.send(
@@ -101,66 +48,56 @@ ext = ext.toLowerCase();
     console.log("IMAGE UPLOADED");
 
     // ======================
-    // BUILD VIEWER URL (🔥 IMPORTANT)
+    // BUILD VIEWER URL
     // ======================
 
     const viewerUrl = `https://ignitestudio.shop/pages/viewer?id=${fileId}&ext=${ext}&name=${encodeURIComponent(name)}&msg=${encodeURIComponent(message)}`;
 
     // ======================
-    // QR GENERATION
-    // ======================
-
-    console.log("GENERATING QR");
-
-    const qr = await QRCode.toDataURL(viewerUrl);
-
-    const base64Data = qr.replace(/^data:image\/png;base64,/, "");
-    const qrBuffer = Buffer.from(base64Data, "base64");
-
-    const qrKey = `qr/${fileId}.png`;
-
-    console.log("ATTEMPTING QR UPLOAD TO qrcodes");
-
-    await R2.send(
-      new PutObjectCommand({
-        Bucket: "qrcodes",
-        Key: qrKey,
-        Body: qrBuffer,
-        ContentType: "image/png",
-      })
-    );
-
-    const qrUrl = `https://pub-676d7b5d3431443084db6a06b3ce26e3.r2.dev/${qrKey}`;
-
-    console.log("QR SUCCESSFULLY STORED IN qrcodes");
-
-    // ======================
-    // RESPONSE
+    // RESPOND IMMEDIATELY (🔥 SPEED FIX)
     // ======================
 
     res.json({
       success: true,
       uploadId: submissionId,
       fileId,
-      variant,
-      message,
       name,
-      qrUrl,
-      url: viewerUrl // 🔥 THIS WAS MISSING
+      message,
+      url: viewerUrl
     });
+
+    // ======================
+    // QR GENERATION (BACKGROUND)
+    // ======================
+
+    (async () => {
+      try {
+        console.log("GENERATING QR IN BACKGROUND");
+
+        const qr = await QRCode.toDataURL(viewerUrl);
+        const base64Data = qr.replace(/^data:image\/png;base64,/, "");
+        const qrBuffer = Buffer.from(base64Data, "base64");
+
+        const qrKey = `qr/${fileId}.png`;
+
+        await R2.send(
+          new PutObjectCommand({
+            Bucket: "qrcodes",
+            Key: qrKey,
+            Body: qrBuffer,
+            ContentType: "image/png",
+          })
+        );
+
+        console.log("QR STORED (BACKGROUND)");
+
+      } catch (err) {
+        console.error("QR BACKGROUND ERROR:", err.message);
+      }
+    })();
 
   } catch (err) {
     console.error("UPLOAD ERROR:", err);
     res.status(500).json({ error: err.message });
   }
-});
-
-// ======================
-// START SERVER
-// ======================
-
-const PORT = process.env.PORT || 10000;
-
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server running on port ${PORT}`);
 });
