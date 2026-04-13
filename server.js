@@ -66,6 +66,7 @@ app.get("/preview", (req, res) => {
         <meta charset="utf-8"/>
         <meta name="viewport" content="width=device-width, initial-scale=1"/>
         <title>Preview</title>
+        <link rel="preload" as="image" href="${fileUrl}">
         <style>
           body {
             margin:0;
