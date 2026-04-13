@@ -22,7 +22,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 // DATABASE (NEW)
 // ======================
 
-const db = new sqlite3.Database("./uploads.db");
+const db = new sqlite3.Database("/tmp/uploads.db");
 
 db.run(`
   CREATE TABLE IF NOT EXISTS uploads (
